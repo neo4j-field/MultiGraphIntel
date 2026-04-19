@@ -3,7 +3,7 @@
 Source: prior design conversation, captured verbatim.
 Target platform: Vertex AI Agent Builder / ADK, Coordinator-Dispatcher pattern.
 Deployment runtime: Vertex AI Agent Engine.
-GCP project: neo4jeventdemos, region us-central1.
+GCP project: <PROJECT_ID>, region us-central1.
 
 Architecture: one root router delegates to three specialist subagents via
 LLM-driven delegation (transfer_to_agent). Subagents own one data substrate
@@ -25,12 +25,12 @@ System instruction:
 
   You are a graph intelligence router. For each user question:
   1. If the question is about historical patterns or aggregates across
-     large datasets, delegate to the analytical_graph subagent.
+     large datasets, delegate to the analytical_graph_agent.
   2. If the question is about a live entity, transaction, or session,
-     delegate to the operational_graph subagent.
+     delegate to the operational_graph_agent.
   3. If the question requires reasoning over relationships, memory of
      prior decisions, community membership, or link predictions,
-     delegate to the intelligence_graph subagent.
+     delegate to the intelligence_graph_agent.
   Always cite which subagent answered and why.
 
 ================================================================================
@@ -114,8 +114,7 @@ OPEN ITEMS
   1. Author full system instructions for the three subagents.
      The descriptions above are agent-card blurbs, not operating prompts.
   2. Add the three subagent nodes in Agent Designer canvas.
-  3. Scaffold Terraform (infra/) to enable required APIs and create the
-     service account graph-intel-sa@neo4jeventdemos.iam.gserviceaccount.com
-     with least-privilege IAM.
+  3. Scaffold Terraform (infra/) to enable required APIs and create a
+     dedicated service account with least-privilege IAM.
   4. Write initial_design.md capturing architecture decisions and
      trade-offs.

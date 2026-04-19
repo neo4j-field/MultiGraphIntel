@@ -1,14 +1,25 @@
-# Terraform for Multi-Agent Graph Intelligence
+# Terraform for Multi-Graph Intel Multi-Agent System
 
-locals {
-  project_id = "neo4jeventdemos"
-  region     = "us-central1"
-  service_account_name = "graph-intel-sa"
+variable "project_id" {
+  description = "The GCP Project ID"
+  type        = string
+}
+
+variable "region" {
+  description = "The GCP Region"
+  type        = string
+  default     = "us-central1"
+}
+
+variable "service_account_name" {
+  description = "Name of the graph intelligence service account"
+  type        = string
+  default     = "graph-intel-sa"
 }
 
 provider "google" {
-  project = local.project_id
-  region  = local.region
+  project = var.project_id
+  region  = var.region
 }
 
 # 1. Enable Required APIs
@@ -28,38 +39,38 @@ resource "google_project_service" "apis" {
 
 # 2. Create Service Account
 resource "google_service_account" "graph_intel_sa" {
-  account_id   = local.service_account_name
+  account_id   = var.service_account_name
   display_name = "Graph Intelligence Service Account"
-  project      = local.project_id
+  project      = var.project_id
 }
 
 # 3. Least-Privilege IAM Roles
 resource "google_project_iam_member" "bigquery_viewer" {
-  project = local.project_id
+  project = var.project_id
   role    = "roles/bigquery.dataViewer"
   member  = "serviceAccount:${google_service_account.graph_intel_sa.email}"
 }
 
 resource "google_project_iam_member" "bigquery_job_user" {
-  project = local.project_id
+  project = var.project_id
   role    = "roles/bigquery.jobUser"
   member  = "serviceAccount:${google_service_account.graph_intel_sa.email}"
 }
 
 resource "google_project_iam_member" "spanner_database_user" {
-  project = local.project_id
+  project = var.project_id
   role    = "roles/spanner.databaseUser"
   member  = "serviceAccount:${google_service_account.graph_intel_sa.email}"
 }
 
 resource "google_project_iam_member" "secret_manager_accessor" {
-  project = local.project_id
+  project = var.project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.graph_intel_sa.email}"
 }
 
 resource "google_project_iam_member" "vertex_ai_user" {
-  project = local.project_id
+  project = var.project_id
   role    = "roles/aiplatform.user"
   member  = "serviceAccount:${google_service_account.graph_intel_sa.email}"
 }

@@ -4,7 +4,7 @@ This guide outlines the manual steps and final configuration required to deploy 
 
 ## Prerequisites
 
-1.  **GCP Project:** `neo4jeventdemos`
+1.  **GCP Project:** Set your target project ID in your environment.
 2.  **Terraform:** Apply the configuration in `infra/` to enable APIs and create the service account.
     ```bash
     cd infra

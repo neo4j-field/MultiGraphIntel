@@ -37,7 +37,7 @@ To ensure a unified graph intelligence layer, the architecture includes a data f
 
 ## Security & IAM
 
-- **Identity:** All agents operate under the `graph-intel-sa@neo4jeventdemos.iam.gserviceaccount.com` service account.
+- **Identity:** All agents operate under a dedicated service account (e.g., `graph-intel-sa@<PROJECT_ID>.iam.gserviceaccount.com`).
 - **Least Privilege:**
     - `roles/bigquery.jobUser` and `roles/bigquery.dataViewer` for analytical workloads.
     - `roles/spanner.databaseUser` for operational workloads.
