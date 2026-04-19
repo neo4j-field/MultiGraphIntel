@@ -30,7 +30,7 @@ System instruction:
      delegate to the operational_graph_agent.
   3. If the question requires reasoning over relationships, memory of
      prior decisions, community membership, or link predictions,
-     delegate to the intelligence_graph_agent.
+     delegate to the intelligence_graph_agent (Neo4j Aura + GDS).
   Always cite which subagent answered and why.
 
 ================================================================================

@@ -11,7 +11,13 @@ This guide outlines the manual steps and final configuration required to deploy 
     terraform init
     terraform apply
     ```
-3.  **Neo4j Aura:** Ensure an Aura instance is running and credentials are stored in GCP Secret Manager.
+3.  **Neo4j Aura & MCP:** Populate the following secrets in GCP Secret Manager to enable the Intelligence Agent:
+    - `neo4j-uri`: The Aura connection URI.
+    - `neo4j-username`: Database username.
+    - `neo4j-password`: Database password.
+    - `mcp-client-id`: Client ID for the Neo4j MCP endpoint.
+    - `mcp-client-secret`: Client Secret for the Neo4j MCP endpoint.
+    - `mcp-endpoint`: The unified MCP REST endpoint URL.
 
 ## Step 1: Vertex AI Agent Builder Configuration
 

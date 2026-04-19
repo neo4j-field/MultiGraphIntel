@@ -1,1 +1,4 @@
-.DS_Store\n.gemini/
+.DS_Store
+.gemini/
+Neo4j-*.txt
+*.tfvars

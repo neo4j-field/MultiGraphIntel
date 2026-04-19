@@ -75,7 +75,80 @@ resource "google_project_iam_member" "vertex_ai_user" {
   member  = "serviceAccount:${google_service_account.graph_intel_sa.email}"
 }
 
-# 4. Outputs
+# 4. Neo4j & MCP Secrets
+resource "google_secret_manager_secret" "neo4j_uri" {
+  secret_id = "neo4j-uri"
+  project   = var.project_id
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+}
+
+resource "google_secret_manager_secret" "neo4j_username" {
+  secret_id = "neo4j-username"
+  project   = var.project_id
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+}
+
+resource "google_secret_manager_secret" "neo4j_password" {
+  secret_id = "neo4j-password"
+  project   = var.project_id
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+}
+
+resource "google_secret_manager_secret" "mcp_client_id" {
+  secret_id = "mcp-client-id"
+  project   = var.project_id
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+}
+
+resource "google_secret_manager_secret" "mcp_client_secret" {
+  secret_id = "mcp-client-secret"
+  project   = var.project_id
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+}
+
+resource "google_secret_manager_secret" "mcp_endpoint" {
+  secret_id = "mcp-endpoint"
+  project   = var.project_id
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+}
+
+# 5. Outputs
 output "service_account_email" {
   value = google_service_account.graph_intel_sa.email
 }
