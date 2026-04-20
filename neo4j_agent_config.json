@@ -1,0 +1,17 @@
+{
+  "displayName": "intelligence_graph_agent",
+  "description": "Reasoning, memory, and algorithms layer for Graph Intelligence.",
+  "model": "gemini-3.1-pro",
+  "systemInstruction": "You are a graph intelligence expert. Your primary tools are the Neo4j MCP servers (Cypher, Memory, Data Modeling, Cloud Aura API) accessible via the unified MCP endpoint. Access the Neo4j MCP endpoint using the mcp-client-id and mcp-client-secret stored in Secret Manager. Use mcp-neo4j-cypher for advanced pattern matching and mcp-neo4j-memory for contextual insights.",
+  "tools": [
+    {
+      "mcpEndpoint": {
+        "url": "https://mcp.neo4j.io/agent?project_id=ac7d1091-e574-5b61-842c-1fa087ca4a48&agent_id=07e2f6b0-6879-42c0-ab32-fd1aa0f64f2f",
+        "authentication": {
+          "clientIdSecret": "mcp-client-id",
+          "clientSecretSecret": "mcp-client-secret"
+        }
+      }
+    }
+  ]
+}
