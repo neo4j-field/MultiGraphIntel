@@ -85,30 +85,96 @@ Cross-substrate card links from accounts to BigQuery FraudGraph cards:
   Parameters:
     {}
 
-Constraint: this shim is read-only. CREATE, MERGE, SET, DELETE, REMOVE, and
-procedure calls that mutate state are rejected at the shim boundary. Use the
+Graph Data Science (GDS) algorithms are available. Use them in stream mode
+so results flow back to you without mutating the stored graph.
+
+GDS standard workflow (project, run, drop):
+  Step 1 - Project an in-memory graph over the Account transfer network:
+    CALL gds.graph.project(
+      'accounts_transfers',
+      'Account',
+      {TRANSFERS: {orientation: 'NATURAL', properties: ['amount']}}
+    )
+    Parameters: {}
+
+  Step 2a - Louvain community detection (streams communityId per node):
+    CALL gds.louvain.stream('accounts_transfers')
+    YIELD nodeId, communityId, intermediateCommunityIds
+    RETURN gds.util.asNode(nodeId).id AS account_id,
+           communityId
+    ORDER BY communityId, account_id
+    Parameters: {}
+
+  Step 2b - PageRank (streams influence score per node):
+    CALL gds.pageRank.stream('accounts_transfers')
+    YIELD nodeId, score
+    RETURN gds.util.asNode(nodeId).id AS account_id,
+           score
+    ORDER BY score DESC
+    Parameters: {}
+
+  Step 2c - Weakly Connected Components (find isolated clusters):
+    CALL gds.wcc.stream('accounts_transfers')
+    YIELD nodeId, componentId
+    RETURN componentId, collect(gds.util.asNode(nodeId).id) AS accounts
+    ORDER BY size(accounts) DESC
+    Parameters: {}
+
+  Step 3 - Drop the in-memory projection when finished:
+    CALL gds.graph.drop('accounts_transfers', false)
+    Parameters: {}
+
+Constraints: this shim is read-only with respect to the stored graph.
+CREATE/MERGE/SET/DELETE/REMOVE on stored data and any gds.*.write procedures
+are rejected at the shim boundary. GDS stream, stats, mutate, project, and
+drop are permitted because they only affect the in-memory catalog. Use the
 Analytical or Operational agents for anything that belongs in BigQuery or
 Spanner instead.
 """.strip()
 
-WRITE_KEYWORDS = {
-    "CREATE", "MERGE", "SET", "DELETE", "REMOVE", "DROP",
+import re
+
+# Raw-Cypher write keywords that mutate the stored graph directly.
+RAW_WRITE_KEYWORDS = (
+    "CREATE", "MERGE", "SET", "DELETE", "REMOVE",
     "FOREACH", "LOAD", "USING PERIODIC",
-}
+)
+
+# Procedure-level patterns that mutate the stored graph through CALL.
+# gds.*.write/writeNodeProperties/writeRelationship persist results back
+# to the on-disk Neo4j graph, so they are rejected. gds.graph.project and
+# gds.graph.drop operate on the in-memory graph catalog only and are safe.
+FORBIDDEN_CALL_PATTERNS = [
+    re.compile(r"\bCALL\s+GDS\.[\w.]*\.WRITE(NODEPROPERTIES|RELATIONSHIP|RELATIONSHIPTYPE)?\b", re.IGNORECASE),
+    re.compile(r"\bCALL\s+APOC\.[\w.]*\.(CREATE|DELETE|SET|REMOVE|MERGE)\b", re.IGNORECASE),
+    re.compile(r"\bCALL\s+DB\.[\w.]*\.(CREATE|DROP|DELETE)\b", re.IGNORECASE),
+    re.compile(r"\bCALL\s+DBMS\.", re.IGNORECASE),
+]
+
+# Regex that recognises the raw-Cypher keywords as standalone tokens, so the
+# substring "CREATE" inside a string literal or a GDS graph name like
+# "createdAt_index" does not false-positive.
+RAW_WRITE_RE = re.compile(
+    r"\b(" + "|".join(re.escape(k) for k in RAW_WRITE_KEYWORDS) + r")\b",
+    re.IGNORECASE,
+)
+
+
+def _strip_string_literals(cypher: str) -> str:
+    """Remove single- and double-quoted strings so keyword detection does not
+    misfire on identifiers or labels that happen to contain write words."""
+    without_single = re.sub(r"'(?:\\.|[^'\\])*'", "''", cypher)
+    without_double = re.sub(r'"(?:\\.|[^"\\])*"', '""', without_single)
+    return without_double
 
 
 def _looks_like_write(cypher: str) -> bool:
-    upper = cypher.upper()
-    for keyword in WRITE_KEYWORDS:
-        if keyword in upper:
+    scrubbed = _strip_string_literals(cypher)
+    if RAW_WRITE_RE.search(scrubbed):
+        return True
+    for pattern in FORBIDDEN_CALL_PATTERNS:
+        if pattern.search(scrubbed):
             return True
-    # Block side-effecting CALL procedures. Allow CALL {...} subqueries that
-    # are purely read-only by checking for a non-subquery CALL followed by an
-    # identifier (e.g. db.create, apoc.create, dbms.security.createUser).
-    if "CALL " in upper:
-        for bad in (".CREATE", ".DELETE", ".SET", ".REMOVE", ".CLEAR", ".MERGE"):
-            if bad in upper:
-                return True
     return False
 
 
