@@ -1,0 +1,23 @@
+{
+  "appDisplayName": "MultiGraph Intel Dashboard",
+  "engine": "Vertex AI Agent Builder",
+  "agentConfig": {
+    "rootAgent": "graph-intelligence-router",
+    "location": "us-central1",
+    "project": "neo4jeventdemos"
+  },
+  "uiFeatures": {
+    "enableCitations": true,
+    "displayAgentSwitching": true,
+    "theme": "Neo4j Slate & GCP Blue",
+    "suggestedQueries": [
+      "Is Account #101 currently active in Spanner?",
+      "Find fraud rings in BigQuery from the last 12 months.",
+      "Reason over Alice's community in Neo4j and predict her next transaction."
+    ]
+  },
+  "integration": {
+    "type": "A2A_PEER_V1",
+    "handoffStyle": "Transparent"
+  }
+}
