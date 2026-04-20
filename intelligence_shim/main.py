@@ -26,7 +26,14 @@ HARD_ROW_LIMIT = int(os.getenv("NEO4J_HARD_ROW_LIMIT", "1000"))
 driver: Driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USERNAME, NEO4J_PASSWORD))
 
 FRAUDGRAPH_SCHEMA_HINT = """
-Neo4j Intelligence graph schema (database: neo4j on Aura 27ad415a):
+Neo4j Intelligence graph schema (database: neo4j on Aura 27ad415a).
+
+CRITICAL TYPE NOTES (common source of empty results):
+  - Account.id is INT. Pass as an integer: {"id": 101}, NOT {"id": "101"}.
+  - Person.id is INT. Same rule.
+  - Card.card_id and Case.case_id are STRINGs.
+  - If your query returns zero rows and you passed an id, the most likely
+    cause is a string/int mismatch on the parameter.
 
 Node labels and properties:
   Person   (id INT PK, name STRING, country STRING)
@@ -43,14 +50,40 @@ Relationship types:
   (:Account)-[:LINKED_TO_CARD]->(:Card)
   (:Case)-[:INVESTIGATES]->(:Account)
 
-Query idioms to prefer:
-  - Use parameters with $name syntax, not string interpolation.
-  - Read the community as a property: (a:Account).community_id, not a (:Community) label.
-  - For the laundering ring use: MATCH p = (a:Account)-[:SUSPECTED_LAUNDERING_RING*]->(a)
-  - For an analyst case on an account use:
-      MATCH (c:Case)-[:INVESTIGATES]->(a:Account {id: $id})
-      RETURN c.case_id, c.analyst, c.summary, c.recommended_action
-  - For cross-substrate card links use: (a:Account)-[:LINKED_TO_CARD]->(k:Card)
+Do NOT invent these. They do not exist in this graph:
+  - (:Community) label           (community is a property, not a node)
+  - [:HAS_CASE], [:BELONGS_TO]   (use [:INVESTIGATES] from Case to Account)
+
+Worked examples you can adapt verbatim.
+
+Community + open case for an account (this is the canonical demo query):
+  Cypher:
+    MATCH (a:Account {id: $id})
+    OPTIONAL MATCH (c:Case {status: 'OPEN'})-[:INVESTIGATES]->(a)
+    RETURN a.community_id AS community_id,
+           a.fraud_score  AS fraud_score,
+           c.case_id      AS case_id,
+           c.analyst      AS analyst,
+           c.recommended_action AS recommended_action
+  Parameters:
+    {"id": 101}
+
+Suspected laundering ring touching an account:
+  Cypher:
+    MATCH p = (a:Account {id: $id})-[:SUSPECTED_LAUNDERING_RING*1..6]->(a)
+    RETURN [n IN nodes(p) | n.id] AS ring_path,
+           [r IN relationships(p) | r.ring_id][0] AS ring_id
+  Parameters:
+    {"id": 101}
+
+Cross-substrate card links from accounts to BigQuery FraudGraph cards:
+  Cypher:
+    MATCH (a:Account)-[:LINKED_TO_CARD]->(k:Card)
+    RETURN a.id AS account_id, k.card_id AS card_id,
+           k.card_type AS card_type, k.fraud_count AS fraud_count
+    ORDER BY k.fraud_count DESC
+  Parameters:
+    {}
 
 Constraint: this shim is read-only. CREATE, MERGE, SET, DELETE, REMOVE, and
 procedure calls that mutate state are rejected at the shim boundary. Use the
@@ -120,7 +153,7 @@ def _run_cypher(cypher: str, parameters: Optional[dict], row_limit: int) -> list
     logger.info(
         "Running Cypher (limit=%d params=%s): %s",
         effective_limit,
-        bool(parameters),
+        parameters or {},
         cypher.replace("\n", " \\ "),
     )
     with driver.session(database=NEO4J_DATABASE, default_access_mode="READ") as session:
@@ -130,6 +163,7 @@ def _run_cypher(cypher: str, parameters: Optional[dict], row_limit: int) -> list
             if len(rows) >= effective_limit:
                 break
             rows.append({key: _serialize(record[key]) for key in record.keys()})
+    logger.info("Cypher returned %d rows", len(rows))
     return rows
 
 
