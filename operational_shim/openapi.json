@@ -1,0 +1,44 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Spanner Graph Operational Shim",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://operational-graph-shim-276655847704.us-central1.run.app"
+    }
+  ],
+  "paths": {
+    "/account/{account_id}": {
+      "get": {
+        "summary": "Get Account Details",
+        "operationId": "get_account",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": { "200": { "description": "Successful Response" } }
+      }
+    },
+    "/person/{person_id}/network": {
+      "get": {
+        "summary": "Get Person Network",
+        "operationId": "get_person_network",
+        "parameters": [
+          {
+            "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": { "200": { "description": "Successful Response" } }
+      }
+    }
+  }
+}
