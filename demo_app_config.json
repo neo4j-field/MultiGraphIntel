@@ -13,7 +13,8 @@
     "suggestedQueries": [
       "Is Account #101 currently active in Spanner?",
       "Find fraud rings in BigQuery from the last 12 months.",
-      "Reason over Alice's community in Neo4j and predict her next transaction."
+      "Reason over Alice's community in Neo4j and predict her next transaction.",
+      "Can I see a visual map of these relationships in Neo4j Bloom?"
     ]
   },
   "integration": {
