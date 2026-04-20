@@ -28,6 +28,7 @@ CREATE TABLE AccountTransferAccount (
   amount FLOAT64,
   create_time TIMESTAMP NOT NULL,
   transaction_id STRING(MAX) NOT NULL,
+  transaction_type STRING(MAX),
   CONSTRAINT FK_FromAccount FOREIGN KEY (from_id) REFERENCES Account(id),
   CONSTRAINT FK_ToAccount FOREIGN KEY (to_id) REFERENCES Account(id),
 ) PRIMARY KEY (from_id, to_id, create_time, transaction_id);
