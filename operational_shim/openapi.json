@@ -2,14 +2,22 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Spanner Graph Operational Shim",
-    "version": "1.0.0"
+    "version": "2.0.0",
+    "description": "REST endpoints are retained for human debugging only. The Vertex AI Operational Graph Agent consumes this service via the MCP endpoint at /mcp."
   },
   "servers": [
     {
-      "url": "https://operational-graph-shim-276655847704.us-central1.run.app"
+      "url": "https://operational-graph-shim-276655847704.us-central1.run.app/api"
     }
   ],
   "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "operationId": "health",
+        "responses": { "200": { "description": "Service is healthy" } }
+      }
+    },
     "/account/{account_id}": {
       "get": {
         "summary": "Get Account Details",
@@ -37,6 +45,25 @@
             "schema": { "type": "integer" }
           }
         ],
+        "responses": { "200": { "description": "Successful Response" } }
+      }
+    },
+    "/query": {
+      "post": {
+        "summary": "Execute arbitrary GQL",
+        "operationId": "execute_gql",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "gql": { "type": "string" } },
+                "required": ["gql"]
+              }
+            }
+          }
+        },
         "responses": { "200": { "description": "Successful Response" } }
       }
     }
