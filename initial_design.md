@@ -59,3 +59,4 @@ To ensure a unified graph intelligence layer, the architecture includes a data f
 - **Vertex AI Agent Engine:** Provides the runtime for agent deployment and A2A communication.
 - **Secret Manager:** Ensures secure management of Aura connection strings and API keys.
 \n### Intelligence Graph Agent Configuration\n![Intelligence Graph Agent Configuration](docs/images/intelligence-agent-config.png)
+\n### MCP Tool Creation (Authentication: None)\n![MCP Tool Creation](docs/images/tool-creation-step.png)\n\n**Architectural Note:** Due to current Vertex AI Studio Preview limitations regarding OAuth/API Key support for MCP, we are utilizing an unauthenticated MCP endpoint for the initial demo validation.
