@@ -58,3 +58,4 @@ To ensure a unified graph intelligence layer, the architecture includes a data f
 - **MCP (Model Context Protocol):** Used exclusively for the `intelligence_graph_agent` to expose deep graph operations and memory state to the LLM.
 - **Vertex AI Agent Engine:** Provides the runtime for agent deployment and A2A communication.
 - **Secret Manager:** Ensures secure management of Aura connection strings and API keys.
+\n### Intelligence Graph Agent Configuration\n![Intelligence Graph Agent Configuration](docs/images/intelligence-agent-config.png)
