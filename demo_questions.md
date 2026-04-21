@@ -132,13 +132,15 @@ Why only Neo4j can answer this: the `LINKED_TO_CARD` relationship is the bridge 
 
 - Tool: `intelligence.bloom_deeplink`
 - Expected: the agent replies with
-  - a Workspace Explore URL pre-wired to the Aura 27ad415a instance,
-  - the suggested search phrase **`Account 101`** to paste into the Explore search bar,
-  - and a one-line instruction to sign in to Aura and run the search.
+  - a primary `bloom_url` pointing at the current Aura Console Explore tool (`console-preview.neo4j.io/tools/explore?search=Account%20101&run=true`),
+  - a fallback `standalone_url` against `bloom.neo4j.io/index.html` with `connectURL` set, in case the user has no active console session,
+  - the suggested search phrase **`Account 101`** (also embedded in the URL but useful to paste manually),
+  - the Aura instance name and host so the user knows which database to select if their console is on a different one,
+  - a one-line instruction summarising the click-through.
 
-Why only Neo4j can answer this: Bloom (now Workspace Explore) is a Neo4j-native graph discovery tool. Spanner and BigQuery have nothing equivalent. The Router hands the user off to a tool designed for human-led visual forensics, keeping the chat answer clickable rather than trying to render the graph in the chat UI.
+Why only Neo4j can answer this: Bloom (now the integrated Explore tool inside the Aura Console) is a Neo4j-native graph discovery experience. Spanner and BigQuery have nothing equivalent. The Router hands the user off to a tool designed for human-led visual forensics, keeping the chat answer clickable rather than trying to render the graph in the chat UI. URL format follows the [Neo4j Bloom Deep-Links documentation](https://neo4j.com/docs/bloom-user-guide/current/bloom-tutorial/deep-links/).
 
-> [Screenshot placeholder: docs/images/bloom-explore-account-101.png - Workspace Explore view after pasting the suggested search phrase]
+> [Screenshot placeholder: docs/images/bloom-explore-account-101.png - Aura Console Explore view after the deep-link auto-runs the search]
 
 ---
 

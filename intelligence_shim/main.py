@@ -266,10 +266,27 @@ _ENTITY_LABELS = {
     "case":    ("Case",    "case_id"),
 }
 
+# Current (as of April 2026) Aura Console deep-link for the Explore tool.
+# Documented at https://neo4j.com/docs/bloom-user-guide/current/bloom-tutorial/deep-links/.
+# The URL is session-scoped: the Aura instance is inherited from whichever
+# database the user has selected in their console, so we do not embed an
+# instance id. The `search` and `run` parameters are documented; `run=true`
+# asks Explore to execute the first suggested query for the search phrase.
+_EXPLORE_BASE_URL = "https://console-preview.neo4j.io/tools/explore"
+_STANDALONE_BLOOM_BASE_URL = "https://bloom.neo4j.io/index.html"
+_AURA_INSTANCE_NAME = os.getenv("AURA_INSTANCE_NAME", "neo4j-aura-pro-1")
+
+
+def _extract_aura_host(neo4j_uri: str) -> str:
+    """Return the bolt host ("<id>.databases.neo4j.io") from a neo4j+s:// URI."""
+    without_scheme = neo4j_uri.split("://", 1)[-1]
+    host = without_scheme.split("/", 1)[0].split(":", 1)[0]
+    return host
+
 
 @mcp.tool()
 def bloom_deeplink(entity_type: str, entity_id: str) -> dict:
-    """Return a Neo4j Workspace Explore (Bloom) deep-link for the given entity.
+    """Return a Neo4j Aura Console Explore (Bloom) deep-link for the entity.
 
     Use this whenever the user asks for a visual representation, says phrases
     like "show me in Bloom", "open this in Explore", "let me see the graph",
@@ -282,15 +299,23 @@ def bloom_deeplink(entity_type: str, entity_id: str) -> dict:
                     Case uses CASE-YYYY-MM-DD.
 
     Returns a dict:
-      bloom_url        - Workspace Explore URL pre-wired to this Aura instance.
-                         The user clicks it, signs in to Aura if needed, and
-                         lands on the Explore tab for database "neo4j".
-      suggested_search - the phrase to paste into the Explore search bar once
-                         the page loads (e.g. "Account 101", "CASE-2026-04-15").
-      note             - one-line instruction the agent can narrate to the user.
+      bloom_url         - Current-generation Aura Console Explore deep-link
+                          (console-preview.neo4j.io/tools/explore) pre-filled
+                          with the search phrase and `run=true` so the first
+                          suggested query executes automatically.
+      standalone_url    - Fallback on the standalone Bloom app
+                          (bloom.neo4j.io/index.html) with an explicit
+                          connectURL, in case the user is not already signed
+                          into the Aura console session.
+      suggested_search  - The phrase to paste manually if the auto-search
+                          does not populate (e.g. "Account 101",
+                          "CASE-2026-04-15").
+      aura_instance     - Friendly name of the Aura instance the user should
+                          make sure is selected in their console sidebar.
+      note              - One-line instruction the agent can narrate.
 
-    The URL degrades gracefully: if Neo4j rotates Workspace parameter names,
-    the user lands on workspace.neo4j.io and selects the database manually.
+    URL format reference: Neo4j Bloom Deep-Links documentation,
+    https://neo4j.com/docs/bloom-user-guide/current/bloom-tutorial/deep-links/
     """
     key = entity_type.strip().lower()
     if key not in _ENTITY_LABELS:
@@ -300,16 +325,6 @@ def bloom_deeplink(entity_type: str, entity_id: str) -> dict:
         )
     label, _ = _ENTITY_LABELS[key]
 
-    # Workspace Explore accepts the full Neo4j connection URI on the
-    # connectURL query param. Keep NEO4J_URI as the source of truth so this
-    # travels with the shim across Aura instances.
-    params = urllib.parse.urlencode({
-        "connectURL": NEO4J_URI,
-        "dbName":     NEO4J_DATABASE,
-        "ntid":       NEO4J_USERNAME,
-    })
-    bloom_url = f"https://workspace.neo4j.io/workspace/explore?{params}"
-
     # Card and Case already carry human-readable ids (CARD-00050, CASE-...),
     # so we leave them alone. Account and Person get the label prefixed.
     if key in ("card", "case"):
@@ -317,13 +332,35 @@ def bloom_deeplink(entity_type: str, entity_id: str) -> dict:
     else:
         suggested_search = f"{label} {str(entity_id).strip()}"
 
+    # Primary: the current Aura Console deep-link. The instance is inherited
+    # from the user's console session; no dbid parameter is documented.
+    primary_params = urllib.parse.urlencode({
+        "search": suggested_search,
+        "run":    "true",
+    })
+    bloom_url = f"{_EXPLORE_BASE_URL}?{primary_params}"
+
+    # Fallback: the standalone bloom.neo4j.io app with connectURL set so the
+    # user can reach the right database even outside an active console session.
+    standalone_params = urllib.parse.urlencode({
+        "connectURL": NEO4J_URI,
+        "search":     suggested_search,
+        "run":        "true",
+    })
+    standalone_url = f"{_STANDALONE_BLOOM_BASE_URL}?{standalone_params}"
+
     return {
         "bloom_url": bloom_url,
+        "standalone_url": standalone_url,
         "suggested_search": suggested_search,
+        "aura_instance": f"{_AURA_INSTANCE_NAME} ({_extract_aura_host(NEO4J_URI)})",
         "note": (
-            "Open the link, sign in to Aura if prompted, then paste the "
-            "suggested search phrase into the Explore search bar to focus "
-            "the graph on this entity."
+            "Open bloom_url. Sign in to Aura if prompted. The search should "
+            "run automatically; if it does not, paste the suggested_search "
+            "phrase into the Explore search bar. If your console is on a "
+            "different database, switch to the aura_instance shown above "
+            "from the sidebar. Use standalone_url if the console session "
+            "is unavailable."
         ),
     }
 
