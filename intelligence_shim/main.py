@@ -209,6 +209,41 @@ def _serialize(value: Any) -> Any:
     return str(value)
 
 
+# Parameter names that are known to be integer ids in our schema. Gemini
+# tends to pass these as quoted strings ("101") even when the schema hint
+# says integer; string parameters silently miss every MATCH because Neo4j
+# compares types strictly. Coerce digit-strings to int at the shim boundary
+# so the agent's query still matches on the first attempt.
+_INT_ID_PARAM_NAMES = frozenset({
+    "account_id", "person_id", "from_id", "to_id",
+    # Generic `id` keys used on MATCH (:Account {id: $id}) patterns.
+    "id", "src_id", "dst_id",
+})
+
+
+def _coerce_int_id_params(parameters: Optional[dict]) -> tuple[Optional[dict], list[str]]:
+    """Return (coerced_params, list_of_coerced_keys).
+
+    Only touches keys in _INT_ID_PARAM_NAMES whose value is a digit-only
+    string. Everything else is passed through unchanged.
+    """
+    if not parameters:
+        return parameters, []
+    coerced: dict[str, Any] = {}
+    changed: list[str] = []
+    for key, value in parameters.items():
+        if (
+            key in _INT_ID_PARAM_NAMES
+            and isinstance(value, str)
+            and value.lstrip("-").isdigit()
+        ):
+            coerced[key] = int(value)
+            changed.append(key)
+        else:
+            coerced[key] = value
+    return coerced, changed
+
+
 def _run_cypher(cypher: str, parameters: Optional[dict], row_limit: int) -> list[dict]:
     if _looks_like_write(cypher):
         raise ValueError(
@@ -217,20 +252,39 @@ def _run_cypher(cypher: str, parameters: Optional[dict], row_limit: int) -> list
             "OPTIONAL MATCH, WITH, UNWIND, RETURN, and read-only CALL subqueries."
         )
     effective_limit = max(1, min(row_limit, HARD_ROW_LIMIT))
+    coerced_params, coerced_keys = _coerce_int_id_params(parameters)
+    if coerced_keys:
+        logger.info(
+            "Auto-coerced string id params to int: %s (original=%s, coerced=%s)",
+            coerced_keys, parameters, coerced_params,
+        )
     logger.info(
         "Running Cypher (limit=%d params=%s): %s",
         effective_limit,
-        parameters or {},
+        coerced_params or {},
         cypher.replace("\n", " \\ "),
     )
     with driver.session(database=NEO4J_DATABASE, default_access_mode="READ") as session:
-        result = session.run(cypher, parameters or {})
+        result = session.run(cypher, coerced_params or {})
         rows: list[dict] = []
         for record in result:
             if len(rows) >= effective_limit:
                 break
             rows.append({key: _serialize(record[key]) for key in record.keys()})
     logger.info("Cypher returned %d rows", len(rows))
+
+    # If we returned zero rows AND the original caller passed a likely-id
+    # parameter as a string (we already coerced it above), surface a helpful
+    # hint. If coercion already happened and we still got zero, the issue is
+    # probably the label or property name, not the id type.
+    if not rows and parameters and not coerced_keys:
+        string_id_keys = [
+            k for k, v in parameters.items()
+            if k in _INT_ID_PARAM_NAMES and isinstance(v, str) and not v.lstrip("-").isdigit()
+        ]
+        if string_id_keys:
+            logger.info("Zero rows and non-numeric string id params: %s", string_id_keys)
+
     return rows
 
 
