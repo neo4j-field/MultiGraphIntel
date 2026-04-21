@@ -322,13 +322,24 @@ _ENTITY_LABELS = {
 
 # Current (as of April 2026) Aura Console deep-link for the Explore tool.
 # Documented at https://neo4j.com/docs/bloom-user-guide/current/bloom-tutorial/deep-links/.
-# The URL is session-scoped: the Aura instance is inherited from whichever
-# database the user has selected in their console, so we do not embed an
-# instance id. The `search` and `run` parameters are documented; `run=true`
-# asks Explore to execute the first suggested query for the search phrase.
-_EXPLORE_BASE_URL = "https://console-preview.neo4j.io/tools/explore"
+# The `search` and `run` parameters are documented; `run=true` asks Explore
+# to execute the first suggested query for the search phrase.
+#
+# Users who belong to multiple Aura organizations land on the last-visited
+# org by default. To avoid that, we embed the org id from AURA_ORG_ID as
+# /org/{id}/tools/explore (verified in the wild as a valid console path).
+# The instance itself is still chosen from the sidebar inside that org.
+_CONSOLE_BASE_URL = "https://console-preview.neo4j.io"
 _STANDALONE_BLOOM_BASE_URL = "https://bloom.neo4j.io/index.html"
 _AURA_INSTANCE_NAME = os.getenv("AURA_INSTANCE_NAME", "neo4j-aura-pro-1")
+_AURA_ORG_ID = os.getenv("AURA_ORG_ID")  # optional; pin the console to a specific org
+
+
+def _explore_base_url() -> str:
+    """Build the Explore tool URL, org-scoped if AURA_ORG_ID is configured."""
+    if _AURA_ORG_ID:
+        return f"{_CONSOLE_BASE_URL}/org/{_AURA_ORG_ID}/tools/explore"
+    return f"{_CONSOLE_BASE_URL}/tools/explore"
 
 
 def _extract_aura_host(neo4j_uri: str) -> str:
@@ -386,13 +397,15 @@ def bloom_deeplink(entity_type: str, entity_id: str) -> dict:
     else:
         suggested_search = f"{label} {str(entity_id).strip()}"
 
-    # Primary: the current Aura Console deep-link. The instance is inherited
-    # from the user's console session; no dbid parameter is documented.
+    # Primary: the current Aura Console deep-link, org-scoped when
+    # AURA_ORG_ID is set so multi-org users land in the right org context.
+    # The instance is inherited from the user's sidebar selection once
+    # inside that org.
     primary_params = urllib.parse.urlencode({
         "search": suggested_search,
         "run":    "true",
     })
-    bloom_url = f"{_EXPLORE_BASE_URL}?{primary_params}"
+    bloom_url = f"{_explore_base_url()}?{primary_params}"
 
     # Fallback: the standalone bloom.neo4j.io app with connectURL set so the
     # user can reach the right database even outside an active console session.
