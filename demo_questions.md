@@ -132,11 +132,11 @@ Why only Neo4j can answer this: the `LINKED_TO_CARD` relationship is the bridge 
 
 - Tool: `intelligence.bloom_deeplink`
 - Expected: the agent replies with
-  - a primary `bloom_url` pointing at the current Aura Console Explore tool (`console-preview.neo4j.io/tools/explore?search=Account%20101&run=true`),
-  - a fallback `standalone_url` against `bloom.neo4j.io/index.html` with `connectURL` set, in case the user has no active console session,
-  - the suggested search phrase **`Account 101`** (also embedded in the URL but useful to paste manually),
+  - a primary `bloom_url` pointing at the standalone Bloom app (`bloom.neo4j.io/index.html?connectURL=…&search=Account%20101&run=true`). This is the recommended path because it connects to the target database by URL and does not depend on which Aura organization the user last visited,
+  - a secondary `console_url` pointing at the Aura Console Explore tool (`console-preview.neo4j.io[/org/{org_id}]/tools/explore?search=…&run=true`) for users who are already in the correct org with the right instance selected,
+  - the suggested search phrase **`Account 101`** (also embedded in both URLs but useful to paste manually),
   - the Aura instance name and host so the user knows which database to select if their console is on a different one,
-  - a one-line instruction summarising the click-through.
+  - a one-line instruction summarising when to use each URL.
 
 Why only Neo4j can answer this: Bloom (now the integrated Explore tool inside the Aura Console) is a Neo4j-native graph discovery experience. Spanner and BigQuery have nothing equivalent. The Router hands the user off to a tool designed for human-led visual forensics, keeping the chat answer clickable rather than trying to render the graph in the chat UI. URL format follows the [Neo4j Bloom Deep-Links documentation](https://neo4j.com/docs/bloom-user-guide/current/bloom-tutorial/deep-links/).
 

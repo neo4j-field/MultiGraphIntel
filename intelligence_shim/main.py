@@ -397,37 +397,43 @@ def bloom_deeplink(entity_type: str, entity_id: str) -> dict:
     else:
         suggested_search = f"{label} {str(entity_id).strip()}"
 
-    # Primary: the current Aura Console deep-link, org-scoped when
-    # AURA_ORG_ID is set so multi-org users land in the right org context.
-    # The instance is inherited from the user's sidebar selection once
-    # inside that org.
+    # Primary: the standalone Bloom app. It takes the target database via
+    # connectURL so it does not depend on which Aura organization or
+    # instance the user last visited in the console. This is the deep-link
+    # format Neo4j documents for this exact hand-off pattern.
     primary_params = urllib.parse.urlencode({
-        "search": suggested_search,
-        "run":    "true",
-    })
-    bloom_url = f"{_explore_base_url()}?{primary_params}"
-
-    # Fallback: the standalone bloom.neo4j.io app with connectURL set so the
-    # user can reach the right database even outside an active console session.
-    standalone_params = urllib.parse.urlencode({
         "connectURL": NEO4J_URI,
         "search":     suggested_search,
         "run":        "true",
     })
-    standalone_url = f"{_STANDALONE_BLOOM_BASE_URL}?{standalone_params}"
+    bloom_url = f"{_STANDALONE_BLOOM_BASE_URL}?{primary_params}"
+
+    # Secondary: the Aura Console Explore tool. It only works if the user
+    # is already in the correct organization AND the correct database is
+    # selected in the sidebar. We include the org id in the path when
+    # AURA_ORG_ID is configured so a multi-org user at least lands on the
+    # right org, but the console still requires the user to have the right
+    # instance selected.
+    console_params = urllib.parse.urlencode({
+        "search": suggested_search,
+        "run":    "true",
+    })
+    console_url = f"{_explore_base_url()}?{console_params}"
 
     return {
         "bloom_url": bloom_url,
-        "standalone_url": standalone_url,
+        "console_url": console_url,
         "suggested_search": suggested_search,
         "aura_instance": f"{_AURA_INSTANCE_NAME} ({_extract_aura_host(NEO4J_URI)})",
         "note": (
-            "Open bloom_url. Sign in to Aura if prompted. The search should "
-            "run automatically; if it does not, paste the suggested_search "
-            "phrase into the Explore search bar. If your console is on a "
-            "different database, switch to the aura_instance shown above "
-            "from the sidebar. Use standalone_url if the console session "
-            "is unavailable."
+            "Primary: open bloom_url. It opens the standalone Bloom app "
+            "and auto-connects to the correct Aura instance via its "
+            "connection URL, regardless of which organization you last "
+            "used. Sign in to Aura when prompted. The search runs "
+            "automatically. "
+            "Secondary: console_url opens the Explore tool inside the "
+            "Aura Console. Use this only if you already have the right "
+            "organization and the instance above selected in the sidebar."
         ),
     }
 
