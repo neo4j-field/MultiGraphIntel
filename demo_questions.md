@@ -40,6 +40,27 @@ For **live, low-latency** account and transfer questions. Strength: sub-second t
 - Tool: `operational.execute_gql`
 - Expected: three-hop ring found: 101 to 102 to 103 to 101, each hop at 1200 WIRE.
 
+### 1.5 Natural-language entity resolution
+> Which person owns the business account?
+
+- Tool: `operational.execute_gql`
+- Expected: Dana owns account 104, a Business account that is currently inactive.
+- Routing cue: specific current-state predicate on a FinGraph concept ("business account"). Ownership plus account metadata is pure Spanner territory.
+
+### 1.6 Multi-hop reach
+> If money leaves Alice's account, which accounts can it reach within at most two hops?
+
+- Tool: `operational.execute_gql` (variable-length pattern up to length 2)
+- Expected: accounts 102, 103, and 104 are all reachable from 101 within two hops.
+- Routing cue: live traversal over Account-to-Account transfers, no history or aggregation involved.
+
+### 1.7 Current inactive accounts
+> Which accounts are currently inactive, and who owns them?
+
+- Tool: `operational.execute_gql`
+- Expected: one row, account 104 (Business) owned by Dana.
+- Routing cue: "currently" flags Spanner. Spanner holds the live is_active flag.
+
 ---
 
 ## 2. Analytical Graph Agent (BigQuery FraudGraph)
@@ -70,7 +91,35 @@ For **warehouse-scale historical** questions, fraud aggregates, and pattern anal
 > What is the average transaction amount for fraud vs non-fraud transactions in the dataset?
 
 - Tool: `analytical.run_sql`
-- Expected: aggregate over 284,807 rows from the ULB public dataset.
+- Expected: two rows. The legit average is close to the overall dataset average. The fraud average is noticeably lower in the ULB dataset, which is a well-known stylized fact about anonymized skimming fraud.
+
+### 2.4 Fraud prevalence
+> How many transactions are in the fraud dataset, and what fraction are flagged as fraud?
+
+- Tool: `analytical.run_sql`
+- Expected: 284,807 total transactions, 492 flagged as fraud, approximately 0.172 percent fraud rate.
+- Routing cue: "How many" plus "dataset" plus "fraction" unambiguously steers to Analytical.
+
+### 2.5 Country fraud comparison
+> Compare fraud rate across card-issuing countries. Which country's cards are flagged as fraud most often?
+
+- Tool: `analytical.run_sql` with GRAPH_TABLE joining Card.country
+- Expected: four rows (USA, UK, CANADA, GERMANY) with fraud rates. Because the seed distributes fraud uniformly across the high-risk card pool, rates will be close but distinguishable; the exact ranking is deterministic based on the FARM_FINGERPRINT hash we used.
+- Routing cue: cross-entity aggregation by card dimension. That is BigQuery's bipartite-graph home turf.
+
+### 2.6 Card-type distribution
+> What is the distribution of fraud across VISA, MASTERCARD, and AMEX cards?
+
+- Tool: `analytical.run_sql` with GRAPH_TABLE grouping by Card.card_type
+- Expected: three rows with fraud counts and total counts per card type.
+- Routing cue: population-level split on a Card property.
+
+### 2.7 Largest fraud
+> What is the largest single fraud transaction amount in the dataset?
+
+- Tool: `analytical.run_sql`
+- Expected: the maximum Amount value among transactions where is_fraud is true. For the ULB public dataset this sits around 2,125.87.
+- Routing cue: "largest in the dataset" is a classic warehouse lookup.
 
 ---
 
