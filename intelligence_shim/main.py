@@ -1,6 +1,7 @@
 import datetime as _dt
 import logging
 import os
+import urllib.parse
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
@@ -256,6 +257,75 @@ def describe_schema() -> str:
     relationships that are only available here.
     """
     return FRAUDGRAPH_SCHEMA_HINT
+
+
+_ENTITY_LABELS = {
+    "account": ("Account", "id"),
+    "person":  ("Person",  "id"),
+    "card":    ("Card",    "card_id"),
+    "case":    ("Case",    "case_id"),
+}
+
+
+@mcp.tool()
+def bloom_deeplink(entity_type: str, entity_id: str) -> dict:
+    """Return a Neo4j Workspace Explore (Bloom) deep-link for the given entity.
+
+    Use this whenever the user asks for a visual representation, says phrases
+    like "show me in Bloom", "open this in Explore", "let me see the graph",
+    or asks to explore a specific account, person, card, or case visually.
+
+    Parameters:
+      entity_type - one of: account, person, card, case.
+      entity_id   - the natural id on that label. Account and Person use an
+                    integer-like id (pass as string). Card uses CARD-NNNNN.
+                    Case uses CASE-YYYY-MM-DD.
+
+    Returns a dict:
+      bloom_url        - Workspace Explore URL pre-wired to this Aura instance.
+                         The user clicks it, signs in to Aura if needed, and
+                         lands on the Explore tab for database "neo4j".
+      suggested_search - the phrase to paste into the Explore search bar once
+                         the page loads (e.g. "Account 101", "CASE-2026-04-15").
+      note             - one-line instruction the agent can narrate to the user.
+
+    The URL degrades gracefully: if Neo4j rotates Workspace parameter names,
+    the user lands on workspace.neo4j.io and selects the database manually.
+    """
+    key = entity_type.strip().lower()
+    if key not in _ENTITY_LABELS:
+        raise ValueError(
+            f"Unknown entity_type: {entity_type!r}. "
+            f"Expected one of: {', '.join(_ENTITY_LABELS)}."
+        )
+    label, _ = _ENTITY_LABELS[key]
+
+    # Workspace Explore accepts the full Neo4j connection URI on the
+    # connectURL query param. Keep NEO4J_URI as the source of truth so this
+    # travels with the shim across Aura instances.
+    params = urllib.parse.urlencode({
+        "connectURL": NEO4J_URI,
+        "dbName":     NEO4J_DATABASE,
+        "ntid":       NEO4J_USERNAME,
+    })
+    bloom_url = f"https://workspace.neo4j.io/workspace/explore?{params}"
+
+    # Card and Case already carry human-readable ids (CARD-00050, CASE-...),
+    # so we leave them alone. Account and Person get the label prefixed.
+    if key in ("card", "case"):
+        suggested_search = str(entity_id).strip()
+    else:
+        suggested_search = f"{label} {str(entity_id).strip()}"
+
+    return {
+        "bloom_url": bloom_url,
+        "suggested_search": suggested_search,
+        "note": (
+            "Open the link, sign in to Aura if prompted, then paste the "
+            "suggested search phrase into the Explore search bar to focus "
+            "the graph on this entity."
+        ),
+    }
 
 
 @mcp.tool()

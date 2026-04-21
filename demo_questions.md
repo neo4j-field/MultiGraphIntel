@@ -127,6 +127,19 @@ Why only Neo4j can answer this: `SUSPECTED_LAUNDERING_RING` is pre-computed and 
 
 Why only Neo4j can answer this: the `LINKED_TO_CARD` relationship is the bridge back to BigQuery's FraudGraph. Only Neo4j holds this link, which is the "unified graph intelligence" story the initial design calls out.
 
+### 3.5 Open in Bloom for visual exploration
+> Open account 101 in Neo4j Bloom so I can explore the ring visually.
+
+- Tool: `intelligence.bloom_deeplink`
+- Expected: the agent replies with
+  - a Workspace Explore URL pre-wired to the Aura 27ad415a instance,
+  - the suggested search phrase **`Account 101`** to paste into the Explore search bar,
+  - and a one-line instruction to sign in to Aura and run the search.
+
+Why only Neo4j can answer this: Bloom (now Workspace Explore) is a Neo4j-native graph discovery tool. Spanner and BigQuery have nothing equivalent. The Router hands the user off to a tool designed for human-led visual forensics, keeping the chat answer clickable rather than trying to render the graph in the chat UI.
+
+> [Screenshot placeholder: docs/images/bloom-explore-account-101.png - Workspace Explore view after pasting the suggested search phrase]
+
 ---
 
 ## A note on data density
