@@ -82,3 +82,34 @@ You are a graph intelligence expert. Your primary tools are the Neo4j MCP server
 **Model:** Gemini 2.5 Pro
 
 **Tools:** Neo4j MCP Endpoint
+
+### Choosing the MCP tool: hosted Aura agent vs custom shim
+
+There are two valid ways to satisfy the "Neo4j MCP Endpoint" requirement. Pick one based on how much control you want over the agent's behaviour.
+
+#### Option A: Neo4j Aura's hosted MCP agent
+
+Neo4j Aura ships a managed MCP agent for each database. You enable it on the Aura console and get a ready-to-use MCP URL. Paste that URL into the Vertex AI tool configuration and you are done.
+
+- **Endpoint format:** `https://mcp.neo4j.io/agent?project_id={project}&agent_id={agent}`
+- **Authentication:** handled by Neo4j Aura's MCP layer
+- **Infrastructure to own:** none
+- **Tradeoff:** fastest to set up. The LLM queries the graph without the schema hints and type warnings you might want to inject, so it may invent labels or mis-type id parameters on the first try.
+
+> [Screenshot placeholder: docs/images/intelligence-tool-option-a.png - Vertex AI MCP tool configured with the Aura-hosted endpoint]
+
+#### Option B: Custom `intelligence_shim` on Cloud Run (what this repo deploys)
+
+Deploy the `intelligence_shim/` service in this repo to Cloud Run. It wraps the official Neo4j Python driver in a FastMCP server that exposes two tools:
+
+- `describe_schema` returns the authoritative schema for the enriched Neo4j model (Person, Account with community_id / pagerank_score / fraud_score, Card, Case with analyst memory, SUSPECTED_LAUNDERING_RING edges, LINKED_TO_CARD bridges, GDS workflow idioms, and type warnings about integer ids).
+- `run_cypher` executes read-only Cypher. Write keywords and mutating procedure calls are rejected at the shim boundary, while GDS projections and stream/stats/mutate procedures are permitted so Louvain, PageRank, and WCC work.
+
+- **Endpoint:** `https://intelligence-graph-shim-<project-num>.us-central1.run.app/mcp/`
+- **Authentication:** currently None for demo. Tighten with IAP or OIDC before production.
+- **Infrastructure to own:** one Cloud Run service running as the shared `graph-intel-sa` service account, with Aura credentials injected from Secret Manager.
+- **Tradeoff:** more control. The shim's schema-aware tool descriptions keep the LLM accurate on the enriched model and make the router's intent analysis land the right Cypher on the first try.
+
+> [Screenshot placeholder: docs/images/intelligence-tool-option-b.png - Vertex AI MCP tool configured with the Cloud Run shim URL]
+
+The reference deployment in this repo uses Option B because demos that span community detection, analyst memory, and cross-substrate card bridges benefit from the structured schema hints. For a purely exploratory Aura environment where the schema is unstable or still evolving, Option A is a reasonable starting point.
