@@ -89,15 +89,66 @@ class MultiMCPClient:
         return "\n".join(parts) if parts else ""
 
 
+_STRIP_KEYS = ("$schema", "additionalProperties", "title", "$defs", "definitions")
+
+
 def _normalize_schema(schema: dict[str, Any] | None) -> dict[str, Any]:
-    """Ensure the JSON Schema is in the shape Gemini's function_declarations expect."""
+    """Make a JSON Schema Gemini-compatible.
+
+    Gemini's function_declarations accept a restricted subset of JSON Schema:
+      - `anyOf`/`oneOf` must not contain a {type: null} branch.
+      - `type: null` alone is not allowed; nullability is expressed with
+        `nullable: true` on the sibling schema.
+      - Vendor extensions like $schema, $defs, title, additionalProperties
+        are rejected at arbitrary depth.
+
+    We walk the tree recursively, strip the forbidden keys, collapse single-
+    branch anyOf/oneOf after removing null variants, and rewrite leftover
+    null variants as nullable flags.
+    """
     if not schema:
         return {"type": "object", "properties": {}}
-    normalized = dict(schema)
-    normalized.setdefault("type", "object")
-    normalized.setdefault("properties", {})
-    # Gemini rejects schemas with $schema, additionalProperties, and title
-    # at arbitrary locations. Strip them at the top level.
-    for key in ("$schema", "additionalProperties", "title"):
-        normalized.pop(key, None)
+    normalized = _walk(schema)
+    if isinstance(normalized, dict):
+        normalized.setdefault("type", "object")
+        if normalized["type"] == "object":
+            normalized.setdefault("properties", {})
     return normalized
+
+
+def _walk(node: Any) -> Any:
+    if isinstance(node, list):
+        return [_walk(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    cleaned: dict[str, Any] = {}
+    for key, value in node.items():
+        if key in _STRIP_KEYS:
+            continue
+        cleaned[key] = _walk(value)
+    for variant_key in ("anyOf", "oneOf"):
+        if variant_key in cleaned:
+            branches = [b for b in cleaned[variant_key] if _branch_type(b) != "null"]
+            had_null = len(branches) != len(cleaned[variant_key])
+            if len(branches) == 1:
+                merged = dict(branches[0])
+                if had_null:
+                    merged["nullable"] = True
+                cleaned.pop(variant_key)
+                # Copy the single branch onto the parent, preserving keys
+                # that the parent already had (e.g. description, default).
+                for mk, mv in merged.items():
+                    cleaned.setdefault(mk, mv)
+            elif branches:
+                cleaned[variant_key] = branches
+                if had_null:
+                    cleaned["nullable"] = True
+            else:
+                cleaned.pop(variant_key)
+    return cleaned
+
+
+def _branch_type(branch: Any) -> str | None:
+    if isinstance(branch, dict):
+        return branch.get("type")
+    return None
