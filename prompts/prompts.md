@@ -13,13 +13,13 @@ One root router delegates to three specialist subagents via LLM-driven delegatio
 
 | Subagent | Data Substrate |
 | --- | --- |
-| `analytical_graph_agent` | BigQuery Graph |
-| `operational_graph_agent` | Spanner Graph |
-| `intelligence_graph_agent` | Neo4j Aura + GDS |
+| Analytical Graph Agent | BigQuery Graph |
+| Operational Graph Agent | Spanner Graph |
+| Intelligence Graph Agent | Neo4j Aura + GDS |
 
 ---
 
-## Root Agent: `graph-intelligence-router`
+## Root Agent: Graph Intelligence Router
 
 | Attribute | Value |
 | --- | --- |
@@ -37,19 +37,19 @@ Routes questions across operational, analytical, and intelligence graph workload
 You are a graph intelligence router. For each user question:
 
 1. If the question is about historical patterns or aggregates across
-   large datasets, delegate to the analytical_graph subagent.
+   large datasets, delegate to the Analytical Graph Agent.
 2. If the question is about a live entity, transaction, or session,
-   delegate to the operational_graph subagent.
+   delegate to the Operational Graph Agent.
 3. If the question requires reasoning over relationships, memory of
    prior decisions, community membership, or link predictions,
-   delegate to the intelligence_graph subagent.
+   delegate to the Intelligence Graph Agent.
 
 Always cite which subagent answered and why.
 ```
 
 ---
 
-## Subagent 1: `analytical_graph_agent`
+## Subagent 1: Analytical Graph Agent
 
 | Attribute | Value |
 | --- | --- |
@@ -71,7 +71,7 @@ Historical, batch, warehouse-scale queries. Source: BigQuery Graph (Preview, Apr
 
 ---
 
-## Subagent 2: `operational_graph_agent`
+## Subagent 2: Operational Graph Agent
 
 | Attribute | Value |
 | --- | --- |
@@ -92,7 +92,7 @@ Live, low-latency, transactional queries. Source: Spanner Graph (GA). Entry tool
 
 ---
 
-## Subagent 3: `intelligence_graph_agent`
+## Subagent 3: Intelligence Graph Agent
 
 | Attribute | Value |
 | --- | --- |
