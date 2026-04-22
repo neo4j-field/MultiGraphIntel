@@ -1,44 +1,73 @@
 # MultiGraph Intel
 
-A production-grade reference architecture for a **multi-agent graph intelligence system on Google Cloud**, built around Vertex AI Agent Builder and three specialized graph substrates: **BigQuery FraudGraph**, **Spanner FinGraph**, and **Neo4j Aura with Graph Data Science**.
+A weekend-style experiment to learn what is new in **Google Cloud Vertex AI Agent Builder**, put together ahead of the **Google Next** event. The goal is to get hands-on with the Agent Designer canvas, the A2A peer protocol, and the MCP and OpenAPI tool types, using graph questions as the workload so the multi-agent routing story has something realistic to do.
 
-The system demonstrates how a single natural-language question can be routed to the right graph engine for the job, then synthesized into a single, cited answer for the analyst.
+Three graph engines on GCP are wired behind one root agent as complementary tool backends:
 
-## Why this exists
+- **BigQuery with GQL**
+- **Spanner Graph**
+- **Neo4j Aura with Graph Data Science**
 
-Real fraud and financial-crime investigations are never served by a single data store. Warehouse-scale history lives in BigQuery. Sub-second account state lives in Spanner. Reasoning, community detection, analyst memory, and graph algorithms live in Neo4j. Forcing analysts to pick the right query tool for each question is a bad experience and it slows investigations down.
+This repo is an exploration, not a benchmark. Each of those engines can cover a wider surface than the role assigned to it here; the scoping choices were made to keep the demo crisp and the routing story easy to follow.
 
-This repository shows how to let the analyst ask the question in plain English and have a router agent delegate the query to the substrate that can answer it best, then cite the source back in the response.
+## What this is, and what this is not
+
+- **This is** a walkthrough of how to build, wire, and demo a coordinator-and-dispatcher multi-agent system on Vertex AI Agent Builder, using three Google Cloud graph services behind it.
+- **This is not** a benchmark or a statement that any one graph engine is better than another. BigQuery GQL, Spanner Graph, and Neo4j Aura plus GDS are each fully capable graph platforms. The choice of which question lands on which substrate here is a demo-design choice, not a claim about capability limits.
+- **This is not** a polished, finished artifact. It is a sandbox for trying out what Agent Builder ships with this week, and what MCP and A2A look like in practice.
+
+## Finding Agent Designer in the console
+
+Agent Designer lives inside Vertex AI in the Cloud Console.
+
+![Vertex AI Agent Builder navigation](screenshots/VertexAI_Agent_Builder.png)
+
+Once inside, the Flow and Preview tabs are where most of the experiment happens.
 
 ## Architecture at a glance
 
 ![Graph Intelligence Router canvas](screenshots/Graph_Intel_Router.png)
 
-The design is a classic **Coordinator and Dispatcher** pattern on top of Vertex AI Agent Builder:
+The design follows the **Coordinator and Dispatcher** pattern inside Vertex AI Agent Builder:
 
 - **Graph Intelligence Router** (root agent) performs intent analysis and delegates using `transfer_to_agent`.
-- **Analytical Graph Agent** answers warehouse-scale and historical questions against BigQuery FraudGraph.
-- **Operational Graph Agent** answers live, transactional questions against Spanner FinGraph.
-- **Intelligence Graph Agent** answers reasoning, algorithm, and memory questions against Neo4j Aura plus GDS.
+- **Analytical Graph Agent** uses the BigQuery GQL and BigQuery ML surface for warehouse-scale historical analytics.
+- **Operational Graph Agent** uses Spanner Graph for live, transactional graph workloads.
+- **Intelligence Graph Agent** uses Neo4j Aura plus Graph Data Science for algorithm-driven reasoning and analyst memory.
 
-All three subagents are peers under the A2A v1.0 protocol. The router narrates which subagent handled the query and which graph substrate the answer came from, so every response is attributable.
+All three subagents are A2A v1.0 peers. The router narrates which subagent handled the query and which substrate produced the answer, so every response stays attributable.
 
-### Substrate decision matrix
+Here is the full Agent Designer canvas once the router is linked to the three subagents:
 
-| Factor            | Analytical (BigQuery)        | Operational (Spanner)       | Intelligence (Neo4j Aura + GDS) |
-| ----------------- | ---------------------------- | --------------------------- | ------------------------------- |
-| Latency           | Higher, warehouse scan       | Low, transactional          | Moderate, reasoning and algo    |
-| Scale             | Petabyte class                | Horizontal and global       | High, memory and GDS            |
-| Query language    | GQL over SQL tables           | Native GQL                  | Cypher via MCP                  |
-| Primary use case  | Historical patterns           | Live transactions           | Reasoning, communities, memory  |
-| Example question  | Top five fraud cards          | Is account 101 active now   | Which ring does Alice belong to |
+![Agent Designer canvas with Router and three subagents](screenshots/Greaph_Intel_Router_Agent.png)
+
+### Why three substrates in one experiment
+
+A single multi-agent system is more interesting to explore when the tools behind it have different shapes. Picking three graph engines that each have their own natural home lets the router actually do intent analysis rather than always routing to the same tool.
+
+- **BigQuery with GQL** is a good fit for petabyte-scale historical scans and for blending graph patterns with BigQuery ML functions that already live in the warehouse.
+- **Spanner Graph** is a good fit for sub-second transactional lookups and low-latency GQL traversals, including multi-hop and cyclic patterns, on live data. Spanner Graph can express a much broader surface than the handful of tool shapes we route to it in this experiment; we kept its agent tool narrow on purpose so the router's intent-analysis story stays readable.
+- **Neo4j Aura plus GDS** is a good fit for the parts of the demo that lean on pre-built graph algorithms (PageRank, Louvain, WCC, link prediction), memory of prior analyst decisions, and a Cypher-centric exploration tool like Bloom.
+
+The point of the experiment is **the routing and the Agent Builder experience**, not a ranking of the engines.
+
+### Substrate responsibility in this demo
+
+| Factor in this demo | Analytical (BigQuery)           | Operational (Spanner Graph)    | Intelligence (Neo4j Aura + GDS) |
+| ------------------- | ------------------------------- | ------------------------------ | ------------------------------- |
+| Typical question    | Historical aggregates           | Live transactional state       | Algorithm-driven reasoning      |
+| Tool protocol       | OpenAPI shim over BigQuery GQL  | OpenAPI shim over Spanner GQL  | MCP over Cypher and GDS         |
+| Example ask         | Top five fraud cards            | Is account 101 active now      | PageRank on the transfer network |
+| Why it sits here    | Warehouse ML functions nearby   | Sub-second live GQL            | Native GDS procedures and MCP   |
+
+This table describes the demo layout, not capability limits. Spanner Graph, BigQuery GQL, and Neo4j Aura can each cover a wider surface than what they are assigned here, and any of them can be extended to cover more of the intent space in a real deployment.
 
 ## Repository layout
 
 ```
 .
-├── analytical_shim/        # Cloud Run service exposing BigQuery FraudGraph tools to the agent
-├── operational_shim/       # Cloud Run service exposing Spanner FinGraph GQL tools to the agent
+├── analytical_shim/        # Cloud Run service exposing BigQuery GQL tools to the Analytical agent
+├── operational_shim/       # Cloud Run service exposing Spanner Graph GQL tools to the Operational agent
 ├── intelligence_shim/      # Cloud Run FastMCP server wrapping Neo4j Aura (schema + Cypher + GDS)
 ├── infra/                  # Terraform for APIs, service account, IAM, and Secret Manager entries
 ├── prompts/                # Versioned prompts used to design and evolve the system
@@ -48,8 +77,8 @@ All three subagents are peers under the A2A v1.0 protocol. The router narrates w
 ├── initial_design.md       # Architectural foundation and tradeoffs
 ├── deployment_guide.md     # Step-by-step deployment on GCP
 ├── demo_questions.md       # Validated demo script with expected answers
-├── neo4j_load.cypher       # Seed data for the enriched Neo4j model (Person, Account, Card, Case, rings)
-├── spanner_graph_setup.sql # DDL for the Spanner FinGraph property graph
+├── neo4j_load.cypher       # Seed data for the Neo4j demo model
+├── spanner_graph_setup.sql # DDL for the Spanner Graph property graph
 ├── sample_data_setup.sql   # Seed rows for Spanner tables
 ├── sample_data_ingestion.sql # Supporting ingestion statements
 ├── neo4j_agent_config.json # Intelligence agent tool configuration
@@ -58,58 +87,68 @@ All three subagents are peers under the A2A v1.0 protocol. The router narrates w
 
 ## The three subagents in detail
 
-### Analytical Graph Agent (BigQuery FraudGraph)
+### Analytical Graph Agent (BigQuery GQL)
 
-Backed by `bigquery-public-data.ml_datasets.ulb_fraud_detection` modeled as a `FraudGraph` (Card, Transaction, `PERFORMED`). The `analytical_shim/` service exposes:
+Backed by `bigquery-public-data.ml_datasets.ulb_fraud_detection` modeled as a property graph (`Card`, `Transaction`, `PERFORMED`). The `analytical_shim/` service exposes:
 
-- `describe_schema` returns the FraudGraph schema and edge definitions.
-- `run_sql` runs read-only SQL, including `GRAPH_TABLE` calls for graph-native pattern matching.
-- `AI.DETECT_ANOMALIES` and other BigQuery ML functions are available for outlier detection and forecasts.
+- `describe_schema` returns the graph schema and edge definitions.
+- `run_sql` runs read-only SQL, including `GRAPH_TABLE` calls for graph-native pattern matching in BigQuery.
+- BigQuery ML functions such as `AI.DETECT_ANOMALIES` are available alongside the graph traversals.
 
-Good fits: top-N fraud cards, fraud prevalence across a dataset, card-type distribution, cross-country aggregation, largest-single-fraud lookups.
+In this demo the agent handles top-N fraud cards, fraud prevalence across the dataset, card-type and country distributions, and largest-single-fraud lookups.
 
-### Operational Graph Agent (Spanner FinGraph)
+### Operational Graph Agent (Spanner Graph)
 
-Backed by a Spanner database with a `FinGraph` property graph (Person, Account, Transfer, Card) and an `is_active` flag per account. The `operational_shim/` service exposes:
+Backed by a Spanner database with a property graph over `Person`, `Account`, `Transfer`, and `Card`, plus an `is_active` flag per account. The `operational_shim/` service exposes:
 
 - `GET /account/{account_id}` for point-lookups.
 - `GET /person/{person_id}/network` for immediate ownership traversal.
-- `POST /query` for arbitrary GQL, including variable-length paths and ring detection.
+- `POST /query` for arbitrary GQL, including variable-length paths and cyclic ring detection.
 
-Good fits: "Is this account active now", one-hop ownership, multi-hop reach within two hops, three-hop ring detection, live inactive-account lists.
+In this demo the agent handles live account status, one-hop ownership, multi-hop reach within two hops, three-hop ring detection, and live inactive-account lists. Spanner Graph's native GQL surface is much broader than these three tool shapes, including richer analytics patterns. We intentionally limited the tool surface here to keep the agent instructions crisp and the routing story easy to follow.
 
 ### Intelligence Graph Agent (Neo4j Aura plus GDS)
 
-Backed by Neo4j Aura with an enriched model that Spanner and BigQuery do not hold:
+Backed by Neo4j Aura, seeded with a small demo model that includes:
 
-- `community_id`, `pagerank_score`, and `fraud_score` on `Account`.
-- `Case` nodes with analyst memory (who opened it, what action was recommended, when).
-- `SUSPECTED_LAUNDERING_RING` relationships pre-computed from transfer chains.
-- `LINKED_TO_CARD` bridges into the BigQuery FraudGraph card space.
+- `community_id`, `pagerank_score`, and `fraud_score` enrichment fields on `Account`.
+- `Case` nodes carrying demo analyst memory (who opened it, what action was recommended, when).
+- `SUSPECTED_LAUNDERING_RING` relationships derived from the transfer topology.
+- `LINKED_TO_CARD` bridges that tie the Neo4j accounts to card ids that also appear in the BigQuery dataset, to illustrate a cross-substrate narrative in the router's synthesis step.
 
 The `intelligence_shim/` service is a FastMCP server that wraps the official Neo4j Python driver and exposes two tools to the LLM:
 
-- `describe_schema` returns the authoritative, type-annotated schema and the GDS workflow idioms, so the model writes accurate Cypher on the first try.
-- `run_cypher` executes read-only Cypher. Mutating keywords are rejected at the shim boundary, but GDS `project`, `stream`, `stats`, and `mutate` procedures are permitted so Louvain, PageRank, and WCC can run.
+- `describe_schema` returns a type-annotated schema and GDS workflow idioms so the model writes accurate Cypher on the first try.
+- `run_cypher` executes read-only Cypher. Mutating keywords are rejected at the shim boundary, while GDS `project`, `stream`, `stats`, and `mutate` procedures are permitted so Louvain, PageRank, and WCC can run.
 
-There is also a `bloom_deeplink(entity_type, entity_id)` tool that returns a deep link into Neo4j Bloom and the Aura Console Explore tool, so the analyst can jump from a chat answer into a visual graph forensics session with the right database preselected.
+There is also a `bloom_deeplink(entity_type, entity_id)` tool that returns a deep link into Neo4j Bloom and the Aura Console Explore tool, so a chat answer can hand off into a visual graph exploration session.
 
-Good fits: Entity 360 briefings, PageRank or Louvain on the transfer network, ring financial impact, cross-substrate risk narratives, visual exploration hand-off.
+In this demo the agent handles entity briefings that blend enrichment fields, GDS algorithms over the transfer network, ring financial impact, and the Bloom hand-off. Similar outcomes can be approximated on other substrates with bespoke code. The agent uses Neo4j Aura here because its native GDS procedures and Bloom integration keep that code minimal for the experiment.
+
+The Intelligence agent configuration in Agent Designer looks like this:
+
+![Intelligence Graph Agent configuration](docs/images/intelligence-agent-config.png)
 
 #### Hosted Aura MCP vs custom shim
 
-There are two valid ways to satisfy the Intelligence agent's tool requirement:
+There are two valid ways to satisfy the Intelligence agent's tool requirement. Both are supported by Vertex AI Agent Builder's MCP tool type.
 
-- **Option A**: use Neo4j Aura's hosted MCP agent. Paste the generated MCP URL into the Vertex AI tool configuration. Zero infrastructure to own. Faster to start, less control over schema hints.
-- **Option B (what this repo deploys)**: deploy `intelligence_shim/` to Cloud Run. More control, schema-aware descriptions, and a reviewable security boundary for write rejection. Slightly more infrastructure to own.
+- **Option A**: use Neo4j Aura's hosted MCP agent. Paste the generated MCP URL into the Vertex AI tool configuration. Zero infrastructure to own, faster to start.
+- **Option B (what this repo deploys)**: deploy `intelligence_shim/` to Cloud Run. Slightly more infrastructure, and in return a visible shim boundary and structured schema hints for the LLM.
 
-The demo in this repository uses Option B because the enriched model, analyst memory, and cross-substrate card bridges benefit from structured schema hints.
+This experiment uses Option B to keep the schema hints explicit, which helps the router's intent analysis land accurate Cypher on the first try. Option A is a perfectly reasonable starting point for environments where the schema is still evolving.
 
-To copy the hosted MCP endpoint from the Neo4j Aura console for Option A:
+To copy the hosted MCP endpoint from the Aura console for Option A:
 
 ![Copy MCP server endpoint from Neo4j Aura](screenshots/Neo4j_Agent_MCP_Endpoint.png)
 
-## Deploying the system
+When adding the MCP endpoint as a tool inside Agent Designer, the current Vertex AI Studio Preview uses authentication type **None** for MCP tools:
+
+![MCP Tool creation step with authentication None](docs/images/tool-creation-step.png)
+
+That caveat is worth flagging up front: before taking this pattern anywhere beyond a demo, put IAP or OIDC in front of the shim and switch the MCP tool to an authenticated configuration.
+
+## Deploying the experiment
 
 ### Prerequisites
 
@@ -140,9 +179,9 @@ gcloud secrets versions add mcp-client-secret --data-file=-
 
 ### 3. Seed the graph substrates
 
-- **Spanner FinGraph**: apply `spanner_graph_setup.sql` (DDL) followed by `sample_data_setup.sql` and `sample_data_ingestion.sql`.
-- **BigQuery FraudGraph**: query the `ulb_fraud_detection` public dataset directly. No ingestion required.
-- **Neo4j Aura**: run `neo4j_load.cypher` to load the enriched model (Person, Account with enrichment columns, Card, Case with analyst memory, `SUSPECTED_LAUNDERING_RING`, `LINKED_TO_CARD`).
+- **Spanner Graph**: apply `spanner_graph_setup.sql` (DDL) followed by `sample_data_setup.sql` and `sample_data_ingestion.sql`.
+- **BigQuery**: query the `ulb_fraud_detection` public dataset directly. No ingestion required.
+- **Neo4j Aura**: run `neo4j_load.cypher` to load the demo model.
 
 ### 4. Deploy the Cloud Run shims
 
@@ -159,10 +198,6 @@ gcloud run deploy intelligence-graph-shim \
 
 ### 5. Configure the agents in Vertex AI Agent Builder
 
-In the GCP console, navigate to Vertex AI and open **Agent Designer**.
-
-![Vertex AI Agent Builder navigation](screenshots/VertexAI_Agent_Builder.png)
-
 Create the four agents using the exact system instructions in `agent_instructions.md`:
 
 - `graph-intelligence-router` with `transfer_to_agent` to each subagent.
@@ -170,34 +205,28 @@ Create the four agents using the exact system instructions in `agent_instruction
 - `operational_graph_agent` with the Operational shim wired as an OpenAPI tool.
 - `intelligence_graph_agent` with the Neo4j MCP endpoint wired as the MCP tool.
 
-The canvas should look like this once the router is linked to all three subagents:
-
-![Agent Designer canvas with Router and three subagents](screenshots/Greaph_Intel_Router_Agent.png)
-
 ### 6. Run the demo
 
 Open the **Preview** tab on the router and run the validated questions in `demo_questions.md`. They are grouped by substrate and each question documents the expected tool call and answer shape, so the demo is reproducible and reviewable.
 
-## Security and IAM
-
-Security is treated as a first-class requirement, not a demo afterthought.
+## Notes on auth and IAM for this experiment
 
 - **Single service identity**: all agents and all Cloud Run shims run as `graph-intel-sa`, so every data access is attributable to one identity and one audit trail.
-- **Least-privilege roles**: `roles/bigquery.dataViewer` and `roles/bigquery.jobUser` for analytical workloads, `roles/spanner.databaseUser` for operational workloads, `roles/secretmanager.secretAccessor` for Aura credentials, and `roles/aiplatform.user` for the Vertex AI runtime. No wildcard roles.
-- **Secret Manager for credentials**: no Aura URIs, usernames, passwords, or MCP client secrets are stored in code. The shims read them at startup.
+- **Least-privilege roles**: `roles/bigquery.dataViewer` and `roles/bigquery.jobUser` for analytical workloads, `roles/spanner.databaseUser` for operational workloads, `roles/secretmanager.secretAccessor` for Aura credentials, and `roles/aiplatform.user` for the Vertex AI runtime.
+- **Secret Manager for credentials**: Aura URIs, usernames, passwords, and MCP client secrets are not stored in code. The shims read them at startup.
 - **Write rejection at the shim boundary**: the Intelligence shim rejects mutating Cypher keywords and non-GDS mutating procedures before they reach the driver. The Operational shim exposes only the three shapes the agent needs, not raw DML.
-- **Demo auth caveat**: the current demo uses unauthenticated MCP because of a Vertex AI Studio Preview limitation around OAuth and API Keys for MCP tools. Before any non-demo use, put IAP or OIDC in front of the shims and switch the MCP tool to an authenticated configuration.
+- **Demo auth caveat (again)**: MCP tools in the current Vertex AI Studio Preview use authentication type None. That is fine for a demo, not fine for anything real. Before taking this pattern further, put IAP or OIDC in front of the shims and switch the MCP tool to an authenticated configuration.
 
-## Trade-offs and design choices
+## Design choices worth flagging
 
-- **Router on Gemini**: a single root agent is simpler to reason about than a hub of narrow tools. The cost is one extra hop per question. In exchange the router provides intent analysis, clarification, and cited synthesis.
-- **Shims instead of raw tools**: wrapping each substrate in a Cloud Run shim gives a reviewable authorization boundary, typed tool descriptions for the LLM, and a single place to add observability. It costs one more deployable service per substrate.
-- **Enrichment lives in Neo4j**: `community_id`, `pagerank_score`, `fraud_score`, case memory, and ring topology are written to Neo4j by a Dataflow job, then surfaced back to BigQuery as BI columns through a reverse ETL. This keeps reasoning-heavy analytics in a graph-native store and keeps BigQuery the system of record for warehouse analytics.
-- **MCP for Neo4j only**: MCP is used where it adds the most value, which is exposing deep graph operations and memory state to the LLM. Spanner and BigQuery are served by plain OpenAPI shims because their tool surfaces are narrower.
+- **Router on Gemini**: a single root agent is easier to reason about than a hub of narrow tools. The cost is one extra hop per question. In return the router provides intent analysis, clarification, and cited synthesis, which are the behaviors this experiment is trying to showcase.
+- **Shims instead of raw tools**: wrapping each substrate in a Cloud Run shim gives a visible authorization boundary, typed tool descriptions for the LLM, and a single place to add observability. Each substrate could also be wired to Vertex AI Agent Builder directly through its native tool connector, and that is a valid alternative.
+- **Enrichment materialized in Neo4j for this demo**: `community_id`, `pagerank_score`, `fraud_score`, analyst case memory, and ring topology are written to Neo4j in the demo seed so the Intelligence agent can call GDS and return answers in one round trip. The same enrichments could be computed in BigQuery with GQL and ML functions, or in Spanner Graph, depending on where a given environment prefers to keep derived features. The demo put them in Neo4j to keep the GDS and MCP story concrete.
+- **MCP for Neo4j, OpenAPI for the other two**: MCP is used where it most changes the LLM's behavior in this experiment, which is exposing schema and memory state to the model. Spanner Graph and BigQuery are served by plain OpenAPI shims because their tool surfaces in this demo are narrower. MCP-native Spanner or BigQuery tools would be a natural extension.
 
 ## Prompt and decision transparency
 
-Prompts used to design and iterate this system are preserved in `prompts/` so the evolution of the architecture is reviewable. `initial_design.md` captures the architectural foundation, `agent_instructions.md` captures the final system instructions, and `demo_questions.md` captures the validated demo script with expected answers. Anyone reviewing the repo should be able to reconstruct how the solution was reasoned through, not just what was shipped.
+Prompts used to design and iterate this system are preserved in `prompts/` so the evolution of the architecture is reviewable. `initial_design.md` captures the architectural foundation, `agent_instructions.md` captures the final system instructions, and `demo_questions.md` captures the validated demo script with expected answers. Anyone reading the repo should be able to reconstruct how the experiment was reasoned through, not just what was shipped.
 
 ## Further reading
 
